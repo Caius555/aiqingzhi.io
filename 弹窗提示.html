@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+	<head>
+		<!-- 定义文档字符编码为UTF-8 -->
+		<meta charset="UTF-8" />
+		<!-- 设置视口，使页面在移动端正确显示 -->
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<!-- 页面标题 -->
+		<title>爱心网提示您：记得照顾好自己</title>
+    <link class="dc"rel="icon" href="https://ts1.tc.mm.bing.net/th/id/OIP-C.u3sw0jn7GChnQrndklCHSwAAAA?rs=1&pid=ImgDetMain&o=7&rm=3">
+		<style>
+			/* 重置所有元素的内外边距，使用border-box盒模型 */
+			* {
+				box-sizing: border-box;
+				margin: 0;
+				padding: 0;
+			}
+
+			/* 主体样式：设置字体、背景网格、颜色和最小高度 */
+			body {
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+				background-image: linear-gradient(0deg, #eee 1px, transparent 0),
+					linear-gradient(90deg, #eee 1px, transparent 0);
+				background-size: 30px 30px;
+				color: #333;
+				min-height: 100dvh;
+				overflow: hidden;
+			}
+
+			/* 移动端样式：允许垂直滚动 */
+			body.is-mobile {
+				overflow-y: auto;
+			}
+
+			/* 看板容器：全屏显示，隐藏溢出内容 */
+			#board {
+				position: relative;
+				width: 100vw;
+				height: 100dvh;
+				overflow: hidden;
+			}
+
+			/* 移动端看板样式：自适应高度 */
+			body.is-mobile #board {
+				height: auto;
+				min-height: 100dvh;
+			}
+
+			/* 卡片基础样式：绝对定位，圆角，阴影，白色背景，初始透明 */
+			.card {
+				position: absolute;
+				width: 220px;
+				border-radius: 12px;
+				box-shadow: 0 16px 35px rgba(0, 0, 0, 0.2);
+				background: #fff;
+				border: 1px solid rgba(0, 0, 0, 0.08);
+				overflow: hidden;
+				opacity: 0;
+				transform-origin: center;
+				transition: transform 0.35s ease, opacity 0.35s ease, left 0.35s ease,
+					top 0.35s ease, width 0.35s ease, height 0.35s ease,
+					border-radius 0.35s ease;
+			}
+
+			/* 拖拽状态卡片：无过渡效果，阴影加深 */
+			.card.dragging {
+				transition: none;
+				box-shadow: 0 22px 45px rgba(0, 0, 0, 0.35);
+			}
+
+			/* 最大化状态卡片：阴影更深 */
+			.card.maximized {
+				box-shadow: 0 28px 60px rgba(0, 0, 0, 0.4);
+			}
+
+			/* 卡片头部：半透明白色背景，可拖拽区域 */
+			.card-header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 10px 12px;
+				background: rgba(255, 255, 255, 0.7);
+				cursor: grab;
+				user-select: none;
+				touch-action: pan-y;
+			}
+
+			/* 拖拽中的卡片头部：改变鼠标样式 */
+			.card-header.dragging {
+				cursor: grabbing;
+			}
+
+			/* 窗口控制按钮容器：水平排列 */
+			.window-controls {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+			}
+
+			/* 控制按钮基础样式：圆形，带边框 */
+			.window-controls .control {
+				position: relative;
+				width: 12px;
+				height: 12px;
+				border-radius: 50%;
+				border: 1px solid rgba(0, 0, 0, 0.08);
+				background: #ccc;
+				cursor: pointer;
+				outline: none;
+				padding: 0;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+			}
+
+			/* 关闭按钮：红色 */
+			.window-controls .control.close {
+				background: #ff5f57;
+				border-color: #e0443e;
+			}
+
+			/* 最小化按钮：黄色 */
+			.window-controls .control.minimize {
+				background: #febb2e;
+				border-color: #dea123;
+			}
+
+			/* 最大化按钮：绿色 */
+			.window-controls .control.maximize {
+				background: #28c840;
+				border-color: #1aab2c;
+			}
+
+			/* 控制按钮图标（默认隐藏） */
+			.window-controls .control::after {
+				content: '';
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				opacity: 0;
+				transition: opacity 0.2s ease;
+			}
+
+			/* 鼠标悬停时显示控制按钮图标 */
+			.card-header:hover .window-controls .control::after {
+				opacity: 0.8;
+			}
+
+			/* 关闭按钮图标：×符号 */
+			.window-controls .control.close::after {
+				content: '×';
+				width: auto;
+				height: auto;
+				background: none;
+				font-size: 10px;
+				line-height: 1;
+				font-weight: 700;
+				color: rgba(0, 0, 0, 0.7);
+			}
+
+			/* 最小化按钮图标：短横线 */
+			.window-controls .control.minimize::after {
+				width: 6px;
+				height: 2px;
+				background: rgba(0, 0, 0, 0.6);
+			}
+
+			/* 最大化按钮图标：方形图案 */
+			.window-controls .control.maximize::after {
+				width: 6px;
+				height: 6px;
+				background: linear-gradient(
+					45deg,
+					rgba(0, 0, 0, 0.6) 0%,
+					rgba(0, 0, 0, 0.6) 45%,
+					transparent 45%,
+					transparent 55%,
+					rgba(0, 0, 0, 0.6) 55%,
+					rgba(0, 0, 0, 0.6) 100%
+				);
+			}
+
+			/* 卡片标题样式 */
+			.card-title {
+				font-size: 13px;
+				font-weight: 600;
+				color: rgba(0, 0, 0, 0.55);
+				padding-left: 10px;
+				flex: 1;
+			}
+
+			/* 卡片内容区域样式 */
+			.card-body {
+				padding: 16px;
+				font-size: 16px;
+				line-height: 1.4;
+				font-weight: 600;
+				color: rgba(0, 0, 0, 0.72);
+			}
+
+			/* 移动端响应式样式 */
+			@media (max-width: 768px) {
+				.card {
+					width: 180px;
+					border-radius: 10px;
+				}
+
+				.card-body {
+					padding: 14px;
+					font-size: 14px;
+				}
+
+				.card-title {
+					font-size: 12px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<!-- 卡片容器 -->
+		<div id="board"></div>
+
+		<script>
+			// 获取看板DOM元素
+			const board = document.getElementById('board')
+			// 定义温馨提示消息数组
+			const messages = [
+				"多喝水哦~记得照顾好自己",
+        "保持微笑，你今天真好看",
+        "保持好心情，一切都会好",
+        "别熬夜啦，早点休息哦",
+        "今天过的开心吗？要快乐",
+        "记得吃饭，别饿肚子呀",
+        "天气多变，注意保暖呢",
+        "累了就歇，别太辛苦啦",
+        "出门记得，带把雨伞哦",
+        "心情要好，生活要甜呀",
+        "记得微笑，你是最棒的",
+        "别太劳累，注意身体呀",
+        "好好吃饭，健康最重要",
+        "早点睡觉，明天更美好",
+        "保持开心，好运自然来",
+        "别想太多，放宽心哦",
+        "记得休息，别太拼啦",
+        "照顾好自己，要好好的",
+        "今天也要，开开心心呀",
+        "别忘记笑，你很可爱",
+        "放松心情，别太紧张",
+        "记得快乐，我在关心",
+        "保重身体，平安喜乐",
+        "别太压抑，学会释怀",
+        "记得开心，我最牵挂",
+        "好好生活，慢慢相遇",
+        "注意休息，劳逸结合",
+        "保持温暖，冬日安康",
+        "别太匆忙，享受生活",
+        "记得幸福，我在祝福"
+			]
+
+			// 定义卡片背景颜色数组
+			const colors = [
+				'#ffe0e3',
+				'#c7f0ff',
+				'#ffd8a8',
+				'#d9f2d9',
+				'#e5d7ff',
+				'#f9f7d9',
+				'#d2f0f8',
+				'#ffd4f5'
+			]
+
+			// 使用WeakMap存储卡片状态，便于垃圾回收
+			const cardStates = new WeakMap()
+			// 定义最大化卡片的高层级值
+			const MAXIMIZED_LAYER = 1000000
+			// 当前激活的最大化卡片
+			let activeMaximizedCard = null
+			// 检测是否为移动设备
+			let isMobile =
+				window.matchMedia('(pointer: coarse)').matches ||
+				window.innerWidth <= 768
+			// 限制最大卡片数量（性能优化）
+			const maxCards = isMobile ? 120 : 180
+			// 初始卡片数量
+			const initialCardCount = isMobile ? 18 : 30
+			// 卡片生成间隔时间（毫秒）
+			const spawnInterval = isMobile ? 700 : 400
+			// z-index计数器
+			let zIndexCursor = 200
+
+			// 根据设备类型添加移动端样式类
+			document.body.classList.toggle('is-mobile', isMobile)
+
+			/**
+			 * 从数组中随机选择一个元素
+			 * @param {Array} array - 源数组
+			 * @returns {*} 随机元素
+			 */
+			function randomFrom(array) {
+				return array[Math.floor(Math.random() * array.length)]
+			}
+
+			/**
+			 * 限制数值在最小值和最大值之间
+			 * @param {number} value - 需要限制的值
+			 * @param {number} min - 最小值
+			 * @param {number} max - 最大值
+			 * @returns {number} 限制后的值
+			 */
+			function clamp(value, min, max) {
+				return Math.min(Math.max(value, min), max)
+			}
+
+			/**
+			 * 应用变换效果到卡片
+			 * @param {HTMLElement} card - 卡片元素
+			 * @param {Object} state - 卡片状态对象
+			 */
+			function applyTransform(card, state) {
+				const scale = state.scale ?? 1
+				const translateX = state.translateX ?? 0
+				const translateY = state.translateY ?? 0
+				const angle = state.angle ?? 0
+				card.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale}) rotate(${angle}deg)`
+			}
+
+			/**
+			 * 将卡片置于最上层
+			 * @param {HTMLElement} card - 卡片元素
+			 */
+			function bringToFront(card) {
+				if (card === activeMaximizedCard) {
+					card.style.zIndex = MAXIMIZED_LAYER
+					return
+				}
+
+				zIndexCursor += 1
+				if (activeMaximizedCard && zIndexCursor >= MAXIMIZED_LAYER) {
+					zIndexCursor = MAXIMIZED_LAYER - 1
+				}
+
+				card.style.zIndex = zIndexCursor
+			}
+
+			/**
+			 * 设置卡片交互功能
+			 * @param {HTMLElement} card - 卡片元素
+			 */
+			function setupCardInteractions(card) {
+				const header = card.querySelector('.card-header')
+				const closeBtn = card.querySelector('.control.close')
+				const minimizeBtn = card.querySelector('.control.minimize')
+				const maximizeBtn = card.querySelector('.control.maximize')
+
+				// 关闭按钮点击事件
+				closeBtn.addEventListener('click', event => {
+					event.stopPropagation()
+					closeCard(card)
+				})
+
+				// 最小化按钮点击事件
+				minimizeBtn.addEventListener('click', event => {
+					event.stopPropagation()
+					minimizeCard(card)
+				})
+
+				// 最大化按钮点击事件
+				maximizeBtn.addEventListener('click', event => {
+					event.stopPropagation()
+					toggleMaximize(card)
+				})
+
+				// 头部拖拽开始事件（非触摸设备）
+				header.addEventListener('pointerdown', event => {
+					if (event.pointerType === 'touch') return
+					startDrag(event, card)
+				})
+
+				// 卡片点击事件：置于最前
+				card.addEventListener('pointerdown', () => {
+					bringToFront(card)
+				})
+
+				// 头部双击事件：切换最大化
+				header.addEventListener('dblclick', event => {
+					if (!event.target.closest('.control')) {
+						toggleMaximize(card)
+					}
+				})
+			}
+
+			/**
+			 * 关闭卡片
+			 * @param {HTMLElement} card - 卡片元素
+			 */
+			function closeCard(card) {
+				const state = cardStates.get(card)
+				if (!state || state.closing) return
+				if (card === activeMaximizedCard) {
+					activeMaximizedCard = null
+				}
+				state.closing = true
+				state.scale = 0.1
+				card.style.opacity = '0'
+				applyTransform(card, state)
+
+				// 过渡结束后移除卡片
+				const handleTransitionEnd = event => {
+					if (event.propertyName === 'opacity') {
+						card.removeEventListener('transitionend', handleTransitionEnd)
+						card.remove()
+					}
+				}
+
+				card.addEventListener('transitionend', handleTransitionEnd)
+			}
+
+			/**
+			 * 最小化卡片
+			 * @param {HTMLElement} card - 卡片元素
+			 */
+			function minimizeCard(card) {
+				const state = cardStates.get(card)
+				if (!state || state.closing) return
+
+				// 最小化动画：缩小并淡出到底部，结束时移除节点释放内存
+				const runMinimize = () => {
+					state.closing = true
+					bringToFront(card)
+					const bottom = Math.max(window.innerHeight - 24, 0)
+					const targetLeft = clamp(
+						state.left,
+						16,
+						Math.max(window.innerWidth - card.offsetWidth - 16, 16)
+					)
+
+					state.left = targetLeft
+					state.top = bottom
+					state.scale = 0.1
+					state.angle = 0
+					card.style.left = `${targetLeft}px`
+					card.style.top = `${bottom}px`
+					card.style.opacity = '0.35'
+					applyTransform(card, state)
+
+					// 过渡结束后移除卡片
+					const handleTransitionEnd = event => {
+						if (event.propertyName === 'transform') {
+							card.removeEventListener('transitionend', handleTransitionEnd)
+							card.remove()
+						}
+					}
+
+					card.addEventListener('transitionend', handleTransitionEnd)
+				}
+
+				// 如果卡片当前是最大化状态，先恢复再最小化
+				if (state.maximized) {
+					activeMaximizedCard = null
+					state.maximized = false
+					card.classList.remove('maximized')
+					card.style.borderRadius = '12px'
+					state.left = 0
+					state.top = 0
+					state.scale = 1
+					state.angle = 0
+					applyTransform(card, state)
+
+					// 下一帧执行最小化动画
+					requestAnimationFrame(() => {
+						requestAnimationFrame(runMinimize)
+					})
+					return
+				}
+
+				runMinimize()
+			}
+
+			/**
+			 * 切换卡片最大化状态
+			 * @param {HTMLElement} card - 卡片元素
+			 */
+			function toggleMaximize(card) {
+				const state = cardStates.get(card)
+				if (!state || state.closing) return
+
+				if (state.maximized) {
+					restoreFromMaximize(card, state)
+				} else {
+					maximizeCard(card, state)
+				}
+			}
+
+			/**
+			 * 最大化卡片
+			 * @param {HTMLElement} card - 卡片元素
+			 * @param {Object} state - 卡片状态对象
+			 */
+			function maximizeCard(card, state) {
+				// 保存最大化前的状态
+				state.beforeMaximize = {
+					left: state.left,
+					top: state.top,
+					scale: state.scale ?? 1,
+					width: card.offsetWidth,
+					height: card.offsetHeight,
+					angle: state.angle ?? 0
+				}
+
+				card.classList.add('maximized')
+				card.style.left = '0px'
+				card.style.top = '0px'
+				card.style.width = `${window.innerWidth}px`
+				card.style.height = `${window.innerHeight}px`
+				card.style.borderRadius = '0'
+
+				state.left = 0
+				state.top = 0
+				state.scale = 1
+				state.angle = 0
+				applyTransform(card, state)
+				activeMaximizedCard = card
+				bringToFront(card)
+				state.maximized = true
+			}
+
+			/**
+			 * 从最大化状态恢复卡片
+			 * @param {HTMLElement} card - 卡片元素
+			 * @param {Object} state - 卡片状态对象
+			 */
+			function restoreFromMaximize(card, state) {
+				const previous = state.beforeMaximize
+				if (!previous) return
+
+				card.classList.remove('maximized')
+				card.style.left = `${previous.left}px`
+				card.style.top = `${previous.top}px`
+				card.style.width = `${previous.width}px`
+				card.style.height = `${previous.height}px`
+				card.style.borderRadius = '12px'
+
+				state.left = previous.left
+				state.top = previous.top
+				state.scale = previous.scale ?? 1
+				state.angle = previous.angle ?? state.angle ?? 0
+				applyTransform(card, state)
+				state.maximized = false
+				if (activeMaximizedCard === card) {
+					activeMaximizedCard = null
+				}
+				bringToFront(card)
+				state.lastPosition = { left: state.left, top: state.top }
+
+				// 延迟重置宽高，避免动画冲突
+				setTimeout(() => {
+					if (!state.maximized) {
+						card.style.width = ''
+						card.style.height = ''
+						state.width = card.offsetWidth
+						state.height = card.offsetHeight
+					}
+				}, 360)
+			}
+
+			/**
+			 * 开始拖拽卡片
+			 * @param {Event} event - 指针事件
+			 * @param {HTMLElement} card - 卡片元素
+			 */
+			function startDrag(event, card) {
+				const control = event.target.closest('.control')
+				if (control) return
+
+				const state = cardStates.get(card)
+				if (!state || state.closing || state.maximized) return
+
+				// 鼠标拖拽使用 rAF 节流，避免频繁触发布局计算
+				event.preventDefault()
+				bringToFront(card)
+
+				const header = card.querySelector('.card-header')
+				card.classList.add('dragging')
+				header.classList.add('dragging')
+
+				state.dragging = true
+				state.dragOffsetX = event.clientX - state.left
+				state.dragOffsetY = event.clientY - state.top
+
+				let dragFrame = null
+				let pendingLeft = state.left
+				let pendingTop = state.top
+
+				/**
+				 * 提交拖拽位置更新
+				 */
+				const commitDrag = () => {
+					dragFrame = null
+					const maxLeft = Math.max(window.innerWidth - card.offsetWidth, 0)
+					const maxTop = Math.max(window.innerHeight - card.offsetHeight, 0)
+					state.left = clamp(pendingLeft, -card.offsetWidth * 0.4, maxLeft)
+					state.top = clamp(pendingTop, -card.offsetHeight * 0.4, maxTop)
+					card.style.left = `${state.left}px`
+					card.style.top = `${state.top}px`
+				}
+
+				/**
+				 * 处理指针移动事件
+				 * @param {Event} moveEvent - 指针移动事件
+				 */
+				const handlePointerMove = moveEvent => {
+					if (!state.dragging) return
+
+					pendingLeft = moveEvent.clientX - state.dragOffsetX
+					pendingTop = moveEvent.clientY - state.dragOffsetY
+					if (dragFrame === null) {
+						dragFrame = requestAnimationFrame(commitDrag)
+					}
+				}
+
+				/**
+				 * 处理指针抬起事件
+				 */
+				const handlePointerUp = () => {
+					state.dragging = false
+					state.lastPosition = { left: state.left, top: state.top }
+					card.classList.remove('dragging')
+					header.classList.remove('dragging')
+					if (dragFrame !== null) {
+						cancelAnimationFrame(dragFrame)
+						commitDrag()
+					}
+					document.removeEventListener('pointermove', handlePointerMove)
+					document.removeEventListener('pointerup', handlePointerUp)
+				}
+
+				document.addEventListener('pointermove', handlePointerMove)
+				document.addEventListener('pointerup', handlePointerUp)
+			}
+
+			/**
+			 * 创建新卡片
+			 */
+			function createCard() {
+				const card = document.createElement('div')
+				card.className = 'card'
+
+				// 随机选择颜色和角度
+				const color = randomFrom(colors)
+				const angleRange = isMobile ? 6 : 10
+				const angle = (Math.random() - 0.5) * angleRange
+				const cardWidth = isMobile ? 180 : 220
+				const cardHeight = isMobile ? 130 : 140
+				const horizontalMargin = isMobile ? 12 : 16
+				const verticalMargin = isMobile ? 12 : 20
+				// 随机位置，确保在视口内
+				const left =
+					horizontalMargin +
+					Math.random() *
+						Math.max(window.innerWidth - cardWidth - horizontalMargin * 2, 0)
+				const top =
+					verticalMargin +
+					Math.random() *
+						Math.max(window.innerHeight - cardHeight - verticalMargin * 2, 0)
+
+				// 设置卡片样式
+				card.style.background = color
+				card.style.left = `${left}px`
+				card.style.top = `${top}px`
+				// 避免z-index冲突
+				if (activeMaximizedCard && zIndexCursor >= MAXIMIZED_LAYER - 2) {
+					zIndexCursor = MAXIMIZED_LAYER - 2
+				}
+				card.style.zIndex = ++zIndexCursor
+
+				// 卡片HTML结构
+				card.innerHTML = `
+					<div class="card-header">
+						<div class="window-controls">
+							<button class="control close" type="button" aria-label="关闭"></button>
+							<button class="control minimize" type="button" aria-label="最小化"></button>
+							<button class="control maximize" type="button" aria-label="最大化"></button>
+						</div>
+						<div class="card-title">温馨提示</div>
+					</div>
+					<div class="card-body">${randomFrom(messages)}</div>
+				`
+
+				// 初始化卡片状态
+				const state = {
+					angle,
+					scale: isMobile ? 0.85 : 0.7,
+					translateX: 0,
+					translateY: 0,
+					left,
+					top,
+					maximized: false,
+					closing: false,
+					lastPosition: { left, top }
+				}
+
+				cardStates.set(card, state)
+				applyTransform(card, state)
+				board.appendChild(card)
+
+				// 记录卡片实际尺寸
+				state.width = card.offsetWidth
+				state.height = card.offsetHeight
+
+				// 下一帧显示卡片动画
+				requestAnimationFrame(() => {
+					state.scale = 1
+					applyTransform(card, state)
+					card.style.opacity = '1'
+				})
+
+				// 设置卡片交互
+				setupCardInteractions(card)
+
+				// 限制卡片数量，移除最旧的卡片
+				if (board.children.length > maxCards) {
+					const oldest = board.firstElementChild
+					if (oldest && oldest !== card) {
+						oldest.remove()
+					}
+				}
+			}
+
+			// 初始创建卡片
+			for (let i = 0; i < initialCardCount; i++) {
+				setTimeout(createCard, i * (isMobile ? 60 : 40))
+			}
+
+			// 定时创建新卡片
+			function scheduleCardCreation() {
+  let currentCardCount = board.children.length;
+  let ratio = currentCardCount / maxCards;
+
+  // 根据比例调整间隔
+  let adjustedInterval = spawnInterval;
+  if (ratio > 0.8) {
+    adjustedInterval = spawnInterval * 5;
+  } else if (ratio > 0.5) {
+    adjustedInterval = spawnInterval * 4;
+  }
+
+  setTimeout(() => {
+    createCard();
+    scheduleCardCreation(); // 递归调度下一次创建
+  }, adjustedInterval);
+}
+
+// 启动调度
+scheduleCardCreation();
+			// 窗口大小改变事件处理
+			window.addEventListener('resize', () => {
+				// 重新检测设备类型
+				isMobile =
+					window.matchMedia('(pointer: coarse)').matches ||
+					window.innerWidth <= 768
+				// 更新移动端样式类
+				document.body.classList.toggle('is-mobile', isMobile)
+
+				// 调整最大化卡片的尺寸
+				document.querySelectorAll('.card.maximized').forEach(card => {
+					card.style.width = `${window.innerWidth}px`
+					card.style.height = `${window.innerHeight}px`
+				})
+			})
+		</script>
+	</body>
+</html>
